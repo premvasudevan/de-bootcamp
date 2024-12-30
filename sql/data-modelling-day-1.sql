@@ -26,37 +26,71 @@
 -- primary key(player_name, current_season)
 -- )
 -- select min(season) from player_seasons
-insert into players
-with yesterday as (
-select * from players where current_season = 2000
-),
-today as (
-select * from player_seasons where season = 2001
-)
-select 
-	coalesce(t.player_name, y.player_name) as player_name,
-	coalesce(t.height, y.height) as height,
-	coalesce(t.college, y.college) as college,
-	coalesce(t.country, y.country) as country,
-	coalesce(t.draft_year, y.draft_year) as draft_year,
-	coalesce(t.draft_round, y.draft_round) as draft_round,
-	coalesce(t.draft_number, y.draft_number) as draft_number,
-	case when y.season_stats IS null then array[row(t.season, t.gp, t.pts, t.reb, t.ast)::season_stats]
-	when t.season is not null then y.season_stats || array[row(t.season, t.gp, t.pts, t.reb, t.ast)::season_stats]
-	else y.season_stats end as season_stats,
-	coalesce(t.season, y.current_season + 1) as current_season,
-	case when t.season is not null then
-		case when t.pts > 20 then 'star'
-		when t.pts > 15 then 'good'
-		when t.pts > 10 then 'average'
-		else 'bad' END::scoring_class
-	else y.scoring_class end as scoring_class,
-	case when t.season is not null then 0
-	else y.year_since_last_played + 1
-	end as year_since_last_played
-	
-from yesterday y full outer join today t on y.player_name = t.player_name
-
+DO $$
+BEGIN 
+	FOR COUNTER IN 1996..2022 LOOP
+		INSERT INTO PLAYERS
+		WITH
+			YESTERDAY AS (
+				SELECT
+					*
+				FROM
+					PLAYERS
+				WHERE
+					CURRENT_SEASON = COUNTER -1
+			),
+			TODAY AS (
+				SELECT
+					*
+				FROM
+					PLAYER_SEASONS
+				WHERE
+					SEASON = COUNTER
+			)
+		SELECT
+			COALESCE(T.PLAYER_NAME, Y.PLAYER_NAME) AS PLAYER_NAME,
+			COALESCE(T.HEIGHT, Y.HEIGHT) AS HEIGHT,
+			COALESCE(T.COLLEGE, Y.COLLEGE) AS COLLEGE,
+			COALESCE(T.COUNTRY, Y.COUNTRY) AS COUNTRY,
+			COALESCE(T.DRAFT_YEAR, Y.DRAFT_YEAR) AS DRAFT_YEAR,
+			COALESCE(T.DRAFT_ROUND, Y.DRAFT_ROUND) AS DRAFT_ROUND,
+			COALESCE(T.DRAFT_NUMBER, Y.DRAFT_NUMBER) AS DRAFT_NUMBER,
+			CASE
+				WHEN Y.SEASON_STATS IS NULL THEN ARRAY[
+					ROW (T.SEASON, T.GP, T.PTS, T.REB, T.AST)::SEASON_STATS
+				]
+				WHEN T.SEASON IS NOT NULL THEN Y.SEASON_STATS || ARRAY[
+					ROW (T.SEASON, T.GP, T.PTS, T.REB, T.AST)::SEASON_STATS
+				]
+				ELSE Y.SEASON_STATS
+			END AS SEASON_STATS,
+			COALESCE(T.SEASON, Y.CURRENT_SEASON + 1) AS CURRENT_SEASON,
+			CASE
+				WHEN T.SEASON IS NOT NULL THEN CASE
+					WHEN T.PTS > 20 THEN 'star'
+					WHEN T.PTS > 15 THEN 'good'
+					WHEN T.PTS > 10 THEN 'average'
+					ELSE 'bad'
+				END::SCORING_CLASS
+				ELSE Y.SCORING_CLASS
+			END AS SCORING_CLASS,
+			CASE
+				WHEN T.SEASON IS NOT NULL THEN 0
+				ELSE Y.YEAR_SINCE_LAST_PLAYED + 1
+			END AS YEAR_SINCE_LAST_PLAYED
+		FROM
+			YESTERDAY Y FULL OUTER JOIN TODAY T ON Y.PLAYER_NAME = T.PLAYER_NAME;
+	END LOOP;
+END; $$
 
 -- select player_name, (unnest(season_stats)::season_stats).* from players where current_season = 2001
-select max(season) from player_seasons
+-- select max(season) from player_seasons
+
+-- DO $$
+-- BEGIN
+-- 	FOR cnt IN 1..5 LOOP
+-- 		RAISE NOTICE 'cnt: %', cnt;
+-- 	END LOOP;
+-- END; $$
+
+-- SELECT * FROM PLAYERS WHERE CURRENT_SEASON = 2022
