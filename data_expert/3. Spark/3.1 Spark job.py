@@ -34,6 +34,9 @@ spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "-1")
 f.broadcast(medals)
 f.broadcast(maps)
 
+#explicit broadcast join
+medals.join(f.broadcast(maps), "mapid")
+
 spark.sql("""
 DROP TABLE IF EXISTS bootcamp.match_details_bucketed
 """)
@@ -147,6 +150,22 @@ agg_df = joined_df\
             .agg(f.sum("player_total_kills").alias("total_kills"), f.sum("count").alias("total_medals"))\
             .select("match_id","mapid","playlist_id","match_details_bucketed.player_gamertag","medal_id", "total_kills", "total_medals")
             
+# Which player averages the most kills per game?
+agg_df.groupby("player_gamertag").agg(f.avg("total_kills").alias("avg_kills")).sort("avg_kills", ascending = False).show(5)
+
+# Which playlist gets played the most?
+agg_df.groupby("playlist_id").agg(f.count("match_id").alias("total_plays")).sort("total_plays", ascending = False)\
+    .select("playlist_id","total_plays").show(5)
+
+# Which map gets played the most?
+agg_df.groupby("mapid").agg(f.count("match_id").alias("total_plays")).sort("total_plays", ascending = False)\
+    .select("mapid","total_plays").show(5)
+
+# Which map do players get the most Killing Spree medals on?
+agg_df.join(f.broadcast(medals), "medal_id")\
+    .where(medals.name == "Killing Spree")\
+    .groupby("mapid").agg(f.count("match_id").alias("total_plays")).sort("total_plays", ascending = False)\
+    .select("mapid","total_plays").show(5)
 
 sorted_mapid = agg_df.repartition(10).sortWithinPartitions("mapid")
 sorted_playlist_id = agg_df.repartition(10).sortWithinPartitions("playlist_id")
